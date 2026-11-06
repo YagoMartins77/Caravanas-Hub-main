@@ -1,0 +1,99 @@
+version: '3.8'
+
+networks:
+  app-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.99.0.0/16
+
+services:
+  catalogo-service:
+    build: ./catalogo-service
+    container_name: catalogo-tom-hanks-yago
+    restart: always
+    ports:
+      - "8228:3000"
+    environment:
+      - PORT=3000
+      - AUTH_SERVICE_URL=http://auth-service-yago:3001
+      - LOG_SERVICE_URL=http://log-service-yago:3002
+      - TMDB_API_KEY=${TMDB_API_KEY}
+      - DB_HOST=35.226.64.52
+      - DB_USER=IAC_2026_02_yago_martins
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=IAC_2026_02_yago_martins
+      - DB_PORT=3306
+      - SESSION_SECRET=${SESSION_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_PUBLISHABLE_KEY=${STRIPE_PUBLISHABLE_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_PRICE_ID=${STRIPE_PRICE_ID}
+      - APP_URL=${APP_URL}
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_PORT_PUBLIC=${MINIO_PORT_PUBLIC:-9003}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-ademiro}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-szoboslai}
+    networks:
+      - app-network
+    depends_on:
+      - auth-service
+      - log-service
+      - minio
+
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service-yago
+    restart: always
+    environment:
+      - DB_HOST=35.226.64.52
+      - DB_USER=IAC_2026_02_yago_martins
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=IAC_2026_02_yago_martins
+      - DB_PORT=3306
+      - SMTP_HOST=smtp-relay.brevo.com
+      - SMTP_PORT=587
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - LOG_SERVICE_URL=http://log-service-yago:3002
+    networks:
+      - app-network
+    depends_on:
+      - log-service
+
+  log-service:
+    build: ./log-service
+    container_name: log-service-yago
+    restart: always
+    environment:
+      - REDIS_URL=redis://redis-auditoria-yago:6379
+      - PORT=3002
+    networks:
+      - app-network
+    depends_on:
+      - redis-auditoria
+
+  redis-auditoria:
+    image: redis:alpine
+    container_name: redis-auditoria-yago
+    restart: always
+    networks:
+      - app-network
+  minio:
+    image: minio/minio
+    container_name: minio-storage
+    ports:
+      - "9003:9000"
+      - "9004:9001" 
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-ademiro}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-szoboslai}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - app-network
+
+volumes:
+  minio_data: 
